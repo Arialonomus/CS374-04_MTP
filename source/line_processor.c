@@ -29,8 +29,7 @@ int main(int argc, char *argv[])
  /* Open file for reading */
  if (argc != 2) errx(1, "program takes a single filepath argument");
  char* input_filepath = argv[1];
- FILE* input = fopen(input_filepath, "re");
- if (!input) err(1, "fopen(): %s", input_filepath);
+ if(!freopen(input_filepath, "re", stdin)) err(1, "fopen(): %s", input_filepath);
 
  /* Initialize buffers & their associated mutexes */
  char input_buf[BUF_SIZE] = {0};
