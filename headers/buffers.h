@@ -46,7 +46,6 @@ struct sharedbuffer
 	size_t write_barrier;		// The index position after the last character written
 	size_t read_barrier;		// The index position of the first unread character
 	pthread_mutex_t mutex;
-	pthread_cond_t condition;
 };
 
 // A global array of shared buffers

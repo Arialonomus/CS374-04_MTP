@@ -35,8 +35,6 @@ int get_barrier(struct sharedbuffer* buffer, const enum barrier_flag flag)
 		retval = *barrier;
 		int status = pthread_mutex_unlock(&buffer->mutex);
 		if(status != 0) pthread_err(status, "pthread_mutex_unlock");
-		status = pthread_cond_signal(&buffer->condition);
-		if(status != 0) pthread_err(status, "pthread_cond_broadcast");
 	}
 
 	return retval;
@@ -54,8 +52,6 @@ int set_barrier(struct sharedbuffer* buffer, const size_t index, const enum barr
 		*barrier = index;
 		int status = pthread_mutex_unlock(&buffer->mutex);
 		if(status != 0) pthread_err(status, "pthread_mutex_unlock");
-		status = pthread_cond_signal(&buffer->condition);
-		if(status != 0) pthread_err(status, "pthread_cond_broadcast");
 		result = 0;
 	}
 
