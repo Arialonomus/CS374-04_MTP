@@ -59,20 +59,20 @@ extern struct sharedbuffer shared[];
 // WRAPPER: Stores the current read barrier position of the passed in buffer in destination
 void get_rbarrier(struct sharedbuffer* buffer, size_t* destination);
 
-// WRAPPER: Sets the current position of the read barrier in a shared buffer
-void set_rbarrier(struct sharedbuffer* buffer, size_t index);
+// WRAPPER: Sets the current position of the read barrier in a shared buffer, returns 0 on success
+int set_rbarrier(struct sharedbuffer* buffer, size_t index);
 
 // WRAPPER: Stores the current write barrier position of the passed in buffer in destination
 void get_wbarrier(struct sharedbuffer* buffer, size_t* destination);
 
-// WRAPPER: Sets the current position of the write barrier in a shared buffer
-void set_wbarrier(struct sharedbuffer* buffer, size_t index);
+// WRAPPER: Sets the current position of the write barrier in a shared buffer, returns 0 on success
+int set_wbarrier(struct sharedbuffer* buffer, size_t index);
 
 // HELPER FUNCTION: Returns the index of the requested barrier in a shared buffer
 int get_barrier(struct sharedbuffer* buffer, enum barrier_flag flag);
 
-// HELPER FUNCTION: Attempts to set the index of the requested in a shared buffer
-void set_barrier(struct sharedbuffer* buffer, size_t index, enum barrier_flag flag);
+// HELPER FUNCTION: Attempts to set the index of the requested in a shared buffer, returns 0 on success
+int set_barrier(struct sharedbuffer* buffer, size_t index, enum barrier_flag flag);
 
 // Wrapper function for err() that sets errno to the number returned from a failed pthread function
 void pthread_err(int status, char* message);

@@ -8,9 +8,9 @@ void get_rbarrier(struct sharedbuffer* buffer, size_t* destination)
 	if (status != -1) *destination = status;
 }
 
-void set_rbarrier(struct sharedbuffer* buffer, const size_t index)
+int set_rbarrier(struct sharedbuffer* buffer, const size_t index)
 {
-	set_barrier(buffer, index, READ);
+	return set_barrier(buffer, index, READ);
 }
 
 void get_wbarrier(struct sharedbuffer* buffer, size_t* destination)
@@ -19,9 +19,9 @@ void get_wbarrier(struct sharedbuffer* buffer, size_t* destination)
 	if (status != -1) *destination = status;
 }
 
-void set_wbarrier(struct sharedbuffer* buffer, const size_t index)
+int set_wbarrier(struct sharedbuffer* buffer, const size_t index)
 {
-	set_barrier(buffer, index, WRITE);
+	return set_barrier(buffer, index, WRITE);
 }
 
 int get_barrier(struct sharedbuffer* buffer, const enum barrier_flag flag)
@@ -42,8 +42,10 @@ int get_barrier(struct sharedbuffer* buffer, const enum barrier_flag flag)
 	return retval;
 }
 
-void set_barrier(struct sharedbuffer* buffer, const size_t index, const enum barrier_flag flag)
+int set_barrier(struct sharedbuffer* buffer, const size_t index, const enum barrier_flag flag)
 {
+	int result = -1;	// Flag for if the barrier was successfully changed
+
 	// Determine which barrier to update
 	size_t* barrier = flag == READ ? &buffer->read_barrier : &buffer->write_barrier;
 
@@ -54,7 +56,10 @@ void set_barrier(struct sharedbuffer* buffer, const size_t index, const enum bar
 		if(status != 0) pthread_err(status, "pthread_mutex_unlock");
 		status = pthread_cond_signal(&buffer->condition);
 		if(status != 0) pthread_err(status, "pthread_cond_broadcast");
+		result = 0;
 	}
+
+	return result;
 }
 
 void pthread_err(const int status, char* message)
