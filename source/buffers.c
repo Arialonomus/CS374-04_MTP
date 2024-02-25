@@ -1,8 +1,10 @@
 #include "buffers.h"
 
+struct sharedbuffer shared[NUM_BUFS];
+
 void get_rbarrier(struct sharedbuffer* buffer, size_t* destination)
 {
-	int status = get_barrier(buffer, READ);
+	const int status = get_barrier(buffer, READ);
 	if (status != -1) *destination = status;
 }
 
@@ -13,7 +15,7 @@ void set_rbarrier(struct sharedbuffer* buffer, const size_t index)
 
 void get_wbarrier(struct sharedbuffer* buffer, size_t* destination)
 {
-	int status = get_barrier(buffer, WRITE);
+	const int status = get_barrier(buffer, WRITE);
 	if (status != -1) *destination = status;
 }
 
@@ -22,10 +24,10 @@ void set_wbarrier(struct sharedbuffer* buffer, const size_t index)
 	set_barrier(buffer, index, WRITE);
 }
 
-int get_barrier(struct sharedbuffer* buffer, enum barrier_flag flag)
+int get_barrier(struct sharedbuffer* buffer, const enum barrier_flag flag)
 {
-	// Determine which barrier to update
-	size_t* barrier = (flag == READ) ? &buffer->read_barrier : &buffer->write_barrier;
+	// Determine which barrier to read
+	const size_t* barrier = flag == READ ? &buffer->read_barrier : &buffer->write_barrier;
 
 	// Attempt to update barrier
 	int retval = -1;
@@ -43,7 +45,7 @@ int get_barrier(struct sharedbuffer* buffer, enum barrier_flag flag)
 void set_barrier(struct sharedbuffer* buffer, const size_t index, const enum barrier_flag flag)
 {
 	// Determine which barrier to update
-	size_t* barrier = (flag == READ) ? &buffer->read_barrier : &buffer->write_barrier;
+	size_t* barrier = flag == READ ? &buffer->read_barrier : &buffer->write_barrier;
 
 	// Attempt to update barrier
 	if (pthread_mutex_trylock(&buffer->mutex) == 0) {

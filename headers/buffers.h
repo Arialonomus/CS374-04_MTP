@@ -50,7 +50,7 @@ struct sharedbuffer
 };
 
 // A global array of shared buffers
-struct sharedbuffer shared[NUM_BUFS];
+extern struct sharedbuffer shared[];
 
 /***********
  * Functions
