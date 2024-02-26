@@ -14,6 +14,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdbool.h>
+#include <unistd.h>
 #include "buffers.h"
 
 enum status_t

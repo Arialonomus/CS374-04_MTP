@@ -46,10 +46,16 @@ int main(int argc, char *argv[])
 	pthread_create(&output_printer, NULL, print_output, NULL);
 
 	// Join threads after processing is complete
-	if (pthread_join(input_reader, NULL) != 0) err(1, "pthread_join(input_reader)");
-	if (pthread_join(newline_converter, NULL) != 0) err(1, "pthread_join(newline_converter)");
-	if (pthread_join(plus_converter, NULL) != 0) err(1, "pthread_join(plus_converter)");
-	if (pthread_join(output_printer, NULL) != 0) err(1, "pthread_join(output_printer)");
+	pthread_join(input_reader, NULL);
+	pthread_join(newline_converter, NULL);
+	pthread_join(plus_converter, NULL);
+	pthread_join(output_printer, NULL);
+
+	// Cleanup shared buffers
+	for (int i = 0; i < NUM_BUFS; ++i) {
+		pthread_mutex_destroy(&shared[i].mutex);
+		pthread_cond_destroy(&shared[i].condition);
+	}
 
 	return EXIT_SUCCESS;
 }

@@ -7,10 +7,10 @@ int check_barrier_pos(struct sharedbuffer* buffer, size_t* destination)
 	// Attempt to read the barrier position
 	if (pthread_mutex_trylock(&buffer->mutex) == 0) {
 		*destination = buffer->barrier;
-		int status = pthread_mutex_unlock(&buffer->mutex);
-		if(status != 0) pthread_err(status, "pthread_mutex_unlock");
-		status = pthread_cond_broadcast(&buffer->condition);
+		int status = pthread_cond_broadcast(&buffer->condition);
 		if(status != 0) pthread_err(status, "pthread_cond_broadcast");
+		status = pthread_mutex_unlock(&buffer->mutex);
+		if(status != 0) pthread_err(status, "pthread_mutex_unlock");
 		return 0;
 	}
 
@@ -32,10 +32,10 @@ int set_barrier_pos(struct sharedbuffer* buffer, const size_t index, const enum 
 
 	// Update the barrier index and return
 	buffer->barrier = index;
-	status = pthread_mutex_unlock(&buffer->mutex);
-	if(status != 0) pthread_err(status, "pthread_mutex_unlock");
 	status = pthread_cond_broadcast(&buffer->condition);
 	if(status != 0) pthread_err(status, "pthread_cond_broadcast");
+	status = pthread_mutex_unlock(&buffer->mutex);
+	if(status != 0) pthread_err(status, "pthread_mutex_unlock");
 	return 0;
 }
 
@@ -54,10 +54,10 @@ void hold(struct sharedbuffer* buffer, const size_t current_pos, size_t* cached_
 	}
 
 	// Release the mutex and return
-	status = pthread_mutex_unlock(&buffer->mutex);
-	if(status != 0) pthread_err(status, "pthread_mutex_unlock");
 	status = pthread_cond_broadcast(&buffer->condition);
 	if(status != 0) pthread_err(status, "pthread_cond_broadcast");
+	status = pthread_mutex_unlock(&buffer->mutex);
+	if(status != 0) pthread_err(status, "pthread_mutex_unlock");
 }
 
 void pthread_err(const int status, char* message)
