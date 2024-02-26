@@ -27,10 +27,10 @@ void* get_input(void* arg);
 bool check_stop();
 
 // Converts all line separator characters from input into spaces
-void* ls_converter(void* arg);
+void* convert_newline(void* arg);
 
 // Converts all instances of "++" to "^"
-void* plus_converter(void* arg);
+void* convert_doubleplus(void* arg);
 
 // Prints processed output to stdout in lines of 80 characters
 void* print_output(void* arg);

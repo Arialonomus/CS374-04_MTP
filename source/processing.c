@@ -56,7 +56,7 @@ bool check_stop()
 	return false;
 }
 
-void* ls_converter(void* arg)
+void* convert_newline(void* arg)
 {
 	// Initialize input iterator
 	struct sharedbuffer* input_buf = &shared[INPUT];
@@ -117,7 +117,7 @@ void* ls_converter(void* arg)
 	}
 }
 
-void* plus_converter(void* arg)
+void* convert_doubleplus(void* arg)
 {
 	// Initialize input iterator
 	struct sharedbuffer* input_buf = &shared[PROCESSING];
