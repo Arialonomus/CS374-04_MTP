@@ -7,24 +7,22 @@ void* get_input(void* arg)
 	// Initialize iterator
 	struct sharedbuffer* output_buf = &shared[INPUT];
 	size_t out_current = 0;
-	char* line = output_buf->buffer;
 
 	enum status_t status = INPROGRESS;
 	for(;;) {
 		while(status == INPROGRESS && out_current < BUF_SIZE - 1) {
 			// Read a line from input
-			line = &line[out_current];
+			char* line = &output_buf->buffer[out_current];
 			if (!fgets(line, BUF_SIZE - out_current, stdin) && ferror(stdin))
 				err (1, "fgets");
 
 			// Check for terminating sequence
 			if (strcmp(line, "STOP\n") == 0) {
 				status = STOPPED;
-				// Flush input until EOF is reached
 				for (int i = 0; i < 5 || !feof(stdin); ++i) {
-					line[i] = '\0';
 					getchar();
 				}
+				line[0] = POISON_PILL_CHAR;
 			}
 
 			// Advance the cached pointer to the new end position
@@ -77,13 +75,15 @@ void* convert_newline(void* arg)
 			++in_current;
 
 			// Check for terminating character
-			if (c == 0) {
+			if (c == POISON_PILL_CHAR) {
+				output_buf->buffer[out_current] = POISON_PILL_CHAR;
 				status = STOPPED;
 			}
-
 			// Process character and place it in output buffer
-			if (c == '\n') c = ' ';
-			output_buf->buffer[out_current] = (char)c;
+			else {
+				if (c == '\n') c = ' ';
+				output_buf->buffer[out_current] = (char)c;
+			}
 			++out_current;
 
 			// Update output barrier if not locked
@@ -144,31 +144,30 @@ void* convert_doubleplus(void* arg)
 			}
 
 			// Check for terminating character
-			if (c == 0) {
+			if (c == POISON_PILL_CHAR) {
 				status = STOPPED;
+				output_buf->buffer[out_current] = POISON_PILL_CHAR;
 			}
 			// Place character in output buffer
 			else {
 				output_buf->buffer[out_current] = (char)c;
-				++out_current;
 				++ready_to_print;
 			}
+			++out_current;
 
 			// Get current input barrier if not locked
 			check_barrier_pos(input_buf, &in_end);
 		}
 		// Send full line of output to downstream thread
 		if (ready_to_print == MAX_LINE_LEN) {
-			output_buf->buffer[out_current] = '\n';
-			++out_current;
 			set_barrier_pos(output_buf, out_current, WAIT);
 			ready_to_print = 0;
 		}
 		// Send termination character to downstream thread
 		else if (status == STOPPED) {
 			size_t barrier_pos = out_current / MAX_LINE_LEN;
-			barrier_pos *= MAX_LINE_LEN + 1;
-			output_buf->buffer[barrier_pos] = '\0';
+			barrier_pos *= MAX_LINE_LEN;
+			output_buf->buffer[barrier_pos] = POISON_PILL_CHAR;
 			set_barrier_pos(output_buf, barrier_pos + 1, WAIT);
 		}
 
@@ -202,14 +201,13 @@ void* print_output(void* arg)
 	for(;;) {
 		while(status == INPROGRESS && in_current != in_end) {
 			char* line = &input_buf->buffer[in_current];
-			const size_t len = strlen(line);
-			if (len == 0) status = STOPPED;		// Check if line consists only of the null terminator
+			if (line[0] == POISON_PILL_CHAR) status = STOPPED;		// Check for poison pill character
 			else {
 				// Write buffered line to output
-				if(write(STDOUT_FILENO, line, MAX_LINE_LEN + 1) == -1)
-					err(1, "write");
+				write(STDOUT_FILENO, line, MAX_LINE_LEN);
+				putchar('\n');
 				fflush(stdout);
-				in_current += MAX_LINE_LEN + 1;
+				in_current += MAX_LINE_LEN;
 
 				// Get current input barrier if not locked
 				check_barrier_pos(input_buf, &in_end);

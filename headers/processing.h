@@ -10,6 +10,10 @@
 #define _GNU_SOURCE
 #endif
 
+#ifndef POISON_PILL_CHAR
+#define POISON_PILL_CHAR 4
+#endif
+
 #include <err.h>
 #include <stdio.h>
 #include <string.h>
