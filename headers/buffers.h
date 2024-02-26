@@ -17,7 +17,7 @@
 #endif
 
 #ifndef BUF_SIZE
-#define BUF_SIZE MAX_LINE_LEN + 2
+#define BUF_SIZE 1000
 #endif
 
 #ifndef NUM_BUFS
@@ -32,13 +32,6 @@ enum buf_name
 	OUTPUT
 };
 
-// Flag for selecting which barrier to set or return
-enum barrier_flag
-{
-	READ,
-	WRITE
-};
-
 // Flag to instruct operation to wait or continue if the mutex is locked
 enum wait_flag
 {
@@ -50,8 +43,7 @@ enum wait_flag
 struct sharedbuffer
 {
 	char buffer[BUF_SIZE];
-	size_t write_barrier;		// The index position after the last character written
-	size_t read_barrier;		// The index position of the first unread character
+	size_t barrier;		// The index position of the read/write barrier
 	pthread_mutex_t mutex;
 	pthread_cond_t condition;
 };
@@ -63,14 +55,14 @@ extern struct sharedbuffer shared[];
  * Functions
  ***********/
 
-// Attempts to store the index of the requested barrier in a shared buffer in the destination, returns 0 on success
-int check_barrier_pos(struct sharedbuffer* buffer, const enum barrier_flag flag, size_t* destination);
+// Attempts to store the index of the barrier in the destination, returns 0 on success
+int check_barrier_pos(struct sharedbuffer* buffer, size_t* destination);
 
-// Sets a barrier, to a desired index, returns 0 on success. Will block if WAIT flag is set
-int set_barrier_pos(struct sharedbuffer* buffer, const enum barrier_flag flag, size_t index, enum wait_flag if_locked);
+// Sets the barrier to a desired index, returns 0 on success. Will block if WAIT flag is set
+int set_barrier_pos(struct sharedbuffer* buffer, size_t index, enum wait_flag if_locked);
 
 // Hold until the status of a barrier has changed
-void hold(struct sharedbuffer* buffer, const enum barrier_flag flag, size_t current_pos, size_t* cached_barrier);
+void hold(struct sharedbuffer* buffer, size_t current_pos, size_t* cached_barrier);
 
 // Wrapper function for err() that sets errno to the number returned from a failed pthread function
 void pthread_err(int status, char* message);
