@@ -24,7 +24,7 @@ void* get_input(void* arg)
 			set_barrier_pos(output_buf, out_current, CONTINUE);
 
 			// Check for STOP sequence after newline
-			if (c == '\n' && check_stop() == true) {
+			if (c == '\n' && check_stop(&out_current) == true) {
 				c = 4;
 				output_buf->buffer[out_current] = (char)c;
 				status = STOPPED;
@@ -36,7 +36,7 @@ void* get_input(void* arg)
 	}
 }
 
-bool check_stop()
+bool check_stop(size_t* current_pos)
 {
 	// Read the next 5 characters from stdin
 	char sequence[6] = {0};
@@ -46,9 +46,12 @@ bool check_stop()
 	// Check if line is the stop sequence
 	if(strcmp(sequence, "STOP\n") == 0) return true;
 
-	// Replace the characters to stdin in reverse order
-	for (int i = strlen(sequence) - 1; i >= 0; --i)
-		ungetc(sequence[i], stdin);
+	// Put put the sequence into the output buffer
+	for (int i = 0; i < strlen(sequence); ++i) {
+		shared[INPUT].buffer[*current_pos] = sequence[i];
+		++*current_pos;
+	}
+
 	return false;
 }
 
@@ -61,7 +64,7 @@ void* convert_newline(void* arg)
 
 	// Initialize output iterator
 	struct sharedbuffer* output_buf = &shared[PROCESSING];
-	size_t out_current = 1;
+	size_t out_current = 0;
 	size_t out_end = BUF_SIZE - 1;
 
 	enum status_t status = INPROGRESS;
@@ -111,7 +114,7 @@ void* convert_doubleplus(void* arg)
 
 	// Initialize output iterator
 	struct sharedbuffer* output_buf = &shared[OUTPUT];
-	size_t out_current = 1;
+	size_t out_current = 0;
 	size_t out_end = BUF_SIZE - 1;
 
 	enum status_t status = INPROGRESS;
@@ -177,7 +180,7 @@ void* print_output(void* arg)
 		while(status == INPROGRESS && in_current != in_end) {
 			// Read a char from the shared buffer
 			int c = input_buf->buffer[in_current];
-			if (++in_current == BUF_SIZE) in_current = 0;
+			++in_current;
 
 			// Get current input barrier if not locked
 			check_barrier_pos(input_buf, &in_end);

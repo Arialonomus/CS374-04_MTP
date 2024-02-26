@@ -24,7 +24,7 @@ enum status_t
 void* get_input(void* arg);
 
 // Returns true if the next line of input is "STOP\n"
-bool check_stop();
+bool check_stop(size_t* current_pos);
 
 // Converts all line separator characters from input into spaces
 void* convert_newline(void* arg);
