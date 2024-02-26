@@ -5,29 +5,30 @@ void* get_input(void* arg)
 	// Initialize iterator
 	struct sharedbuffer* output_buf = &shared[INPUT];
 	size_t out_current = 0;
+	char* line = output_buf->buffer;
 
 	enum status_t status = INPROGRESS;
 	for(;;) {
 		while(status == INPROGRESS && out_current < BUF_SIZE - 1) {
 			// Read a line from input
-			char* line = output_buf->buffer;
+			line = &line[out_current];
 			if (!fgets(line, BUF_SIZE - out_current, stdin) && ferror(stdin))
 				err (1, "fgets");
-			const size_t len = strlen(line);
-			if (feof(stdin)) {
-				line[len] = 3;
-				status = FINISHED;
-			}
-			if (strcmp(line, "STOP\n") == 0) {
-				line[len] = 4;
+
+			// Check for terminating sequence or EOF
+			if (feof(stdin) || strcmp(line, "STOP\n") == 0) {
+				line[0] = '\0';
 				status = STOPPED;
 			}
+
+			// Advance the cached pointer to the new end position
+			const size_t len = strlen(line);
 			out_current += len;
 
 			// Attempt to set the barrier for downstream thread
 			set_barrier_pos(output_buf, out_current, CONTINUE);
 		}
-		// Update the write barrier for downstream thread
+		// Update the barrier for downstream thread
 		set_barrier_pos(output_buf, out_current, WAIT);
 
 		// Wait until downstream output is completed before next line read
@@ -43,7 +44,7 @@ void* get_input(void* arg)
 			pthread_cond_broadcast(&downstream->condition);
 			out_current = 0;
 		}
-		return (void*)status;
+		else return (void*)status;
 	}
 }
 
@@ -60,10 +61,13 @@ void* convert_newline(void* arg)
 
 	enum status_t status = INPROGRESS;
 	for(;;) {
-		while(status == INPROGRESS && in_current < in_end) {
+		while(status == INPROGRESS && in_current < in_end && out_current < BUF_SIZE) {
 			// Read a char from the shared buffer
 			int c = input_buf->buffer[in_current];
 			++in_current;
+
+			// Check for terminating character
+			if (c == 0) status = STOPPED;
 
 			// Process character and place it in output buffer
 			if (c == '\n') c = ' ';
@@ -75,23 +79,19 @@ void* convert_newline(void* arg)
 
 			// Get current input barrier if not locked
 			check_barrier_pos(input_buf, &in_end);
-
-			// Check for terminating characters
-			switch (c) {
-				case 3:
-					status = FINISHED; break;
-				case 4:
-					status = STOPPED; break;
-				default:
-					break;
-			}
 		}
 		// Update the write barrier for downstream thread
 		set_barrier_pos(output_buf, out_current, WAIT);
 
-		// Wait for upstream thread to put in more data
-		if (status == INPROGRESS)
+		if (status == INPROGRESS) {
+			// Reset stream as all characters in buffer have been written
+			if (out_current == BUF_SIZE) {
+				in_current = 0;
+				out_current = 0;
+			}
+			// Wait for upstream thread to put in more data
 			hold(input_buf, in_current, &in_end);
+		}
 		else return (void*)status;
 	}
 }
@@ -106,10 +106,11 @@ void* convert_doubleplus(void* arg)
 	// Initialize output iterator
 	struct sharedbuffer* output_buf = &shared[OUTPUT];
 	size_t out_current = 0;
+	size_t ready_to_print = 0;
 
 	enum status_t status = INPROGRESS;
 	for(;;) {
-		while(status == INPROGRESS && in_current < in_end) {
+		while(status == INPROGRESS && in_current < in_end && ready_to_print < 80) {
 			// Read a char from the shared buffer
 			int c = input_buf->buffer[in_current];
 			++in_current;
@@ -126,32 +127,39 @@ void* convert_doubleplus(void* arg)
 				}
 			}
 
+			// Check for terminating character
+			if (c == 0) status = STOPPED;
+
 			// Place character in output buffer
 			output_buf->buffer[out_current] = (char)c;
 			++out_current;
-
-			// Update output barrier if not locked
-			set_barrier_pos(output_buf, out_current, CONTINUE);
+			++ready_to_print;
 
 			// Get current input barrier if not locked
 			check_barrier_pos(input_buf, &in_end);
-
-			// Check for terminating characters
-			switch (c) {
-				case 3:
-					status = FINISHED; break;
-				case 4:
-					status = STOPPED; break;
-				default:
-					break;
-			}
 		}
-		// Update the write barrier for downstream thread
-		set_barrier_pos(output_buf, out_current, WAIT);
+		// Send full line of output to downstream thread
+		if (ready_to_print == MAX_LINE_LEN) {
+			set_barrier_pos(output_buf, out_current, WAIT);
+			ready_to_print = 0;
+		}
+		// Send termination character to downstream thread
+		else if (status == STOPPED) {
+			size_t barrier_pos = out_current / MAX_LINE_LEN;
+			barrier_pos *= MAX_LINE_LEN;
+			output_buf->buffer[barrier_pos] = '\0';
+			set_barrier_pos(output_buf, barrier_pos + 1, WAIT);
+		}
 
-		// Wait for upstream thread to put in more data
-		if (status == INPROGRESS)
+		if (status == INPROGRESS) {
+			// Reset stream as all characters in buffer have been written
+			if (out_current == BUF_SIZE) {
+				in_current = 0;
+				out_current = 0;
+			}
+			// Wait for upstream thread to put in more data
 			hold(input_buf, in_current, &in_end);
+		}
 		else return (void*)status;
 	}
 }
@@ -175,16 +183,10 @@ void* print_output(void* arg)
 			// Get current input barrier if not locked
 			check_barrier_pos(input_buf, &in_end);
 
-			// Check for terminating characters
-			switch (c) {
-				case 3:
-					status = FINISHED;
-					c = '\n'; break;
-				case 4:
-					status = STOPPED;
-					c = '\n'; break;
-				default:
-					break;
+			// Check for terminating character
+			if (c == 0) {
+				status = STOPPED;
+				c = '\n';
 			}
 
 			// Print the character to stdout
@@ -201,8 +203,14 @@ void* print_output(void* arg)
 		set_barrier_pos(input_buf, in_current, WAIT);
 
 		// Wait for upstream thread to put in more data
-		if (status == INPROGRESS)
+		if (status == INPROGRESS) {
+			// Reset stream as all characters in buffer have been written
+			if (in_current == BUF_SIZE) {
+				in_current = 0;
+			}
+			// Wait for upstream thread to put in more data
 			hold(input_buf, in_current, &in_end);
+		}
 		else return (void*)status;
 	}
 }

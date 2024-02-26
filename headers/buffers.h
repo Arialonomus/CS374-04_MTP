@@ -17,7 +17,7 @@
 #endif
 
 #ifndef BUF_SIZE
-#define BUF_SIZE 1000
+#define BUF_SIZE 1001
 #endif
 
 #ifndef NUM_BUFS

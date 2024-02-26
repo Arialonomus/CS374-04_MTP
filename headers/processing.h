@@ -28,9 +28,6 @@ enum status_t
 // Terminates input if the stop processing sequence "STOP\n" is received
 void* get_input(void* arg);
 
-// Returns true if the next line of input is "STOP\n"
-bool check_stop(size_t* current_pos);
-
 // Converts all line separator characters from input into spaces
 void* convert_newline(void* arg);
 
