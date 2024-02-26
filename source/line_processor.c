@@ -51,9 +51,9 @@ int main(int argc, char *argv[])
 
 	// Join threads after processing is complete
 	if (pthread_join(input_reader, NULL) != 0) err(1, "pthread_join(input_reader)");
-	if (pthread_join(newline_converter, NULL) != 0) err(1, "pthread_join(input_reader)");
-	if (pthread_join(plus_converter, NULL) != 0) err(1, "pthread_join(input_reader)");
-	if (pthread_join(output_printer, NULL) != 0) err(1, "pthread_join(input_reader)");
+	if (pthread_join(newline_converter, NULL) != 0) err(1, "pthread_join(newline_converter)");
+	if (pthread_join(plus_converter, NULL) != 0) err(1, "pthread_join(plus_converter)");
+	if (pthread_join(output_printer, NULL) != 0) err(1, "pthread_join(output_printer)");
 
 	return EXIT_SUCCESS;
 }
