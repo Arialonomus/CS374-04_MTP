@@ -5,54 +5,46 @@ void* get_input(void* arg)
 	// Initialize iterator
 	struct sharedbuffer* output_buf = &shared[INPUT];
 	size_t out_current = 0;
-	const size_t out_end = BUF_SIZE - 1;
 
 	enum status_t status = INPROGRESS;
 	for(;;) {
-		while(status == INPROGRESS && out_current < out_end) {
-			// Read a char from input and write it to the buffer
-			int c = getchar();
-			if (ferror(stdin)) err (1, "getchar");
-			if (c == EOF) {
-				c = 3;
+		while(status == INPROGRESS && out_current < BUF_SIZE - 1) {
+			// Read a line from input
+			char* line = output_buf->buffer;
+			if (!fgets(line, BUF_SIZE - out_current, stdin) && ferror(stdin))
+				err (1, "fgets");
+			const size_t len = strlen(line);
+			if (feof(stdin)) {
+				line[len] = 3;
 				status = FINISHED;
 			}
-			output_buf->buffer[out_current] = (char)c;
-			++out_current;
-
-			// Update the barrier if not locked
-			set_barrier_pos(output_buf, out_current, CONTINUE);
-
-			// Check for STOP sequence after newline
-			if (c == '\n' && check_stop(&out_current) == true) {
-				c = 4;
-				output_buf->buffer[out_current] = (char)c;
+			if (strcmp(line, "STOP\n") == 0) {
+				line[len] = 4;
 				status = STOPPED;
 			}
+			out_current += len;
+
+			// Attempt to set the barrier for downstream thread
+			set_barrier_pos(output_buf, out_current, CONTINUE);
 		}
-		// Update the barrier for downstream thread and return
+		// Update the write barrier for downstream thread
 		set_barrier_pos(output_buf, out_current, WAIT);
+
+		// Wait until downstream output is completed before next line read
+		if (status == INPROGRESS) {
+			struct sharedbuffer* downstream = &shared[PROCESSING];
+			pthread_mutex_lock(&downstream->mutex);
+			size_t ds_pos = downstream->barrier;
+			while (ds_pos < BUF_SIZE) {
+				pthread_cond_wait(&downstream->condition, &downstream->mutex);
+				ds_pos = downstream->barrier;
+			}
+			pthread_mutex_unlock(&downstream->mutex);
+			pthread_cond_broadcast(&downstream->condition);
+			out_current = 0;
+		}
 		return (void*)status;
 	}
-}
-
-bool check_stop(size_t* current_pos)
-{
-	// Read the next 5 characters from stdin
-	char sequence[6] = {0};
-	fgets(sequence, 6, stdin);
-	if (ferror(stdin)) err (1, "fgets");
-
-	// Check if line is the stop sequence
-	if(strcmp(sequence, "STOP\n") == 0) return true;
-
-	// Put put the sequence into the output buffer
-	for (int i = 0; i < strlen(sequence); ++i) {
-		shared[INPUT].buffer[*current_pos] = sequence[i];
-		++*current_pos;
-	}
-
-	return false;
 }
 
 void* convert_newline(void* arg)
@@ -65,7 +57,6 @@ void* convert_newline(void* arg)
 	// Initialize output iterator
 	struct sharedbuffer* output_buf = &shared[PROCESSING];
 	size_t out_current = 0;
-	size_t out_end = BUF_SIZE - 1;
 
 	enum status_t status = INPROGRESS;
 	for(;;) {
@@ -115,7 +106,6 @@ void* convert_doubleplus(void* arg)
 	// Initialize output iterator
 	struct sharedbuffer* output_buf = &shared[OUTPUT];
 	size_t out_current = 0;
-	size_t out_end = BUF_SIZE - 1;
 
 	enum status_t status = INPROGRESS;
 	for(;;) {

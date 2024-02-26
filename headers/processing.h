@@ -6,7 +6,12 @@
 #ifndef MTP_PROCESSING_H
 #define MTP_PROCESSING_H
 
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
 #include <err.h>
+#include <stdio.h>
 #include <string.h>
 #include <stdbool.h>
 #include "buffers.h"
