@@ -187,3 +187,55 @@ void* plus_converter(void* arg)
 		else return (void*)status;
 	}
 }
+
+void* print_output(void* arg)
+{
+	// Initialize input iterator
+	struct sharedbuffer* input_buf = &shared[OUTPUT];
+	size_t in_current = 0;
+	size_t in_end = 0;
+
+	enum status_t status = INPROGRESS;
+	for(;;) {
+		unsigned int num_printed = 0;	// Holds the number of characters printed in the current line
+
+		while(status == INPROGRESS && in_current != in_end) {
+			// Read a char from the shared buffer
+			int c = input_buf->buffer[in_current];
+			if (++in_current == BUF_SIZE) in_current = 0;
+
+			// Update the input buffer's barriers if not locked
+			set_barrier_pos(input_buf, READ, in_current, CONTINUE);
+			check_barrier_pos(input_buf, WRITE, &in_end);
+
+			// Check for terminating characters
+			switch (c) {
+				case 3:
+					status = FINISHED;
+					c = '\n'; break;
+				case 4:
+					status = STOPPED;
+					c = '\n'; break;
+				default:
+					break;
+			}
+
+			// Print the character to stdout
+			putchar(c);
+			++num_printed;
+
+			// Wrap line if line line limit has been reached
+			if (num_printed > MAX_LINE_LEN && status == INPROGRESS) {
+				putchar('\n');
+				num_printed = 0;
+			}
+		}
+		// Update the read barrier for upstream thread
+		set_barrier_pos(input_buf, READ, in_current, WAIT);
+
+		// Wait for downstream thread to process more data
+		if (in_current == in_end && status == INPROGRESS)
+			hold(input_buf, WRITE, in_current, &in_end);
+		else return (void*)status;
+	}
+}
