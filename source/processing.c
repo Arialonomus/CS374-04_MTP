@@ -23,7 +23,7 @@ void* get_input(void* arg)
 
 			// Advance the cached pointer to the new end position
 			const size_t len = strlen(line);
-			out_current += len;
+			out_current += len == 0 ? 1 : len;
 
 			// Attempt to set the barrier for downstream thread
 			set_barrier_pos(output_buf, out_current, CONTINUE);
@@ -67,7 +67,9 @@ void* convert_newline(void* arg)
 			++in_current;
 
 			// Check for terminating character
-			if (c == 0) status = STOPPED;
+			if (c == 0) {
+				status = STOPPED;
+			}
 
 			// Process character and place it in output buffer
 			if (c == '\n') c = ' ';

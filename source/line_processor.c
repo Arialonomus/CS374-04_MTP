@@ -23,12 +23,8 @@
 
 int main(int argc, char *argv[])
 {
-	// Open file for reading
-	if (argc == 2) {
-		char* input_filepath = argv[1];
-		if(!freopen(input_filepath, "re", stdin)) err(1, "freopen(): %s", input_filepath);
-	}
-	else if (argc > 2) errx(1, "too many arguments");
+	// Check for valid argument count
+	if (argc > 1) errx(1, "too many arguments");
 
 	// Initialize shared buffers
 	for (int i = 0; i < NUM_BUFS; ++i) {
