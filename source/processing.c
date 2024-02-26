@@ -3,13 +3,13 @@
 void* get_input(void* arg)
 {
 	// Initialize iterator
-	struct sharedbuffer* shr_buf = &shared[INPUT];
-	size_t current = 0;
-	size_t end = BUF_SIZE - 1;
+	struct sharedbuffer* output_buf = &shared[INPUT];
+	size_t out_current = 0;
+	size_t out_end = BUF_SIZE - 1;
 
 	enum status_t status = INPROGRESS;
 	for(;;) {
-		while(status == INPROGRESS && current != end) {
+		while(status == INPROGRESS && out_current != out_end) {
 			// Read a char from input and write it to the buffer
 			int c = getchar();
 			if (ferror(stdin)) err (1, "getchar");
@@ -17,25 +17,25 @@ void* get_input(void* arg)
 				c = 3;
 				status = FINISHED;
 			}
-			shr_buf->buffer[current] = (char)c;
-			if (++current == BUF_SIZE) current = 0;
+			output_buf->buffer[out_current] = (char)c;
+			if (++out_current == BUF_SIZE) out_current = 0;
 
 			// Update the write barrier if not locked
-			set_barrier_pos(shr_buf, WRITE, current, CONTINUE);
+			set_barrier_pos(output_buf, WRITE, out_current, CONTINUE);
 
 			// Check for STOP sequence after newline
 			if (c == '\n' && check_stop() == true) {
 				c = 4;
-				shr_buf->buffer[current] = (char)c;
+				output_buf->buffer[out_current] = (char)c;
 				status = STOPPED;
 			}
 		}
 		// Update the write barrier for downstream thread
-		set_barrier_pos(shr_buf, WRITE, current, WAIT);
+		set_barrier_pos(output_buf, WRITE, out_current, WAIT);
 
 		// Wait for downstream thread to process more data
-		if (current == end && status == INPROGRESS)
-			hold(shr_buf, READ, current, &end);
+		if (out_current == out_end && status == INPROGRESS)
+			hold(output_buf, READ, out_current, &out_end);
 		else return (void*)status;
 	}
 }
