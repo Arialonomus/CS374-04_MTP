@@ -28,11 +28,13 @@ int set_barrier_pos(struct sharedbuffer* buffer, const enum barrier_flag flag, c
 	size_t* barrier = flag == READ ? &buffer->read_barrier : &buffer->write_barrier;
 
 	// Attempt to lock the mutex
-	if (if_locked == WAIT)
+	if (if_locked == WAIT) {
 		status = pthread_mutex_lock(&buffer->mutex);
 		if(status != 0) pthread_err(status, "pthread_mutex_lock");
-	else if (pthread_mutex_trylock(&buffer->mutex) != 0)
+	}
+	else if (pthread_mutex_trylock(&buffer->mutex) != 0) {
 		return -1;
+	}
 
 	// Update the barrier index and return
 	*barrier = index;
