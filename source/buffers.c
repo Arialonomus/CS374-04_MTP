@@ -2,60 +2,67 @@
 
 struct sharedbuffer shared[NUM_BUFS];
 
-void get_rbarrier(struct sharedbuffer* buffer, size_t* destination)
-{
-	const int status = get_barrier(buffer, READ);
-	if (status != -1) *destination = status;
-}
-
-int set_rbarrier(struct sharedbuffer* buffer, const size_t index)
-{
-	return set_barrier(buffer, index, READ);
-}
-
-void get_wbarrier(struct sharedbuffer* buffer, size_t* destination)
-{
-	const int status = get_barrier(buffer, WRITE);
-	if (status != -1) *destination = status;
-}
-
-int set_wbarrier(struct sharedbuffer* buffer, const size_t index)
-{
-	return set_barrier(buffer, index, WRITE);
-}
-
-int get_barrier(struct sharedbuffer* buffer, const enum barrier_flag flag)
+int check_barrier_pos(struct sharedbuffer* buffer, const enum barrier_flag flag, size_t* destination)
 {
 	// Determine which barrier to read
 	const size_t* barrier = flag == READ ? &buffer->read_barrier : &buffer->write_barrier;
 
-	// Attempt to update barrier
-	int retval = -1;
+	// Attempt to read the barrier position
 	if (pthread_mutex_trylock(&buffer->mutex) == 0) {
-		retval = *barrier;
+		*destination = *barrier;
 		int status = pthread_mutex_unlock(&buffer->mutex);
 		if(status != 0) pthread_err(status, "pthread_mutex_unlock");
+		status = pthread_cond_signal(&buffer->condition);
+		if(status != 0) pthread_err(status, "pthread_cond_broadcast");
+		return 0;
 	}
 
-	return retval;
+	return -1;
 }
 
-int set_barrier(struct sharedbuffer* buffer, const size_t index, const enum barrier_flag flag)
+int set_barrier_pos(struct sharedbuffer* buffer, const enum barrier_flag flag, const size_t index, const enum wait_flag if_locked)
 {
-	int result = -1;	// Flag for if the barrier was successfully changed
+	int status = 0;		// Holds the error status for pthread functions
 
 	// Determine which barrier to update
 	size_t* barrier = flag == READ ? &buffer->read_barrier : &buffer->write_barrier;
 
-	// Attempt to update barrier
-	if (pthread_mutex_trylock(&buffer->mutex) == 0) {
-		*barrier = index;
-		int status = pthread_mutex_unlock(&buffer->mutex);
-		if(status != 0) pthread_err(status, "pthread_mutex_unlock");
-		result = 0;
+	// Attempt to lock the mutex
+	if (if_locked == WAIT)
+		status = pthread_mutex_lock(&buffer->mutex);
+		if(status != 0) pthread_err(status, "pthread_mutex_lock");
+	else if (pthread_mutex_trylock(&buffer->mutex) != 0)
+		return -1;
+
+	// Update the barrier index and return
+	*barrier = index;
+	status = pthread_mutex_unlock(&buffer->mutex);
+	if(status != 0) pthread_err(status, "pthread_mutex_unlock");
+	status = pthread_cond_signal(&buffer->condition);
+	if(status != 0) pthread_err(status, "pthread_cond_broadcast");
+	return 0;
+}
+
+void hold(struct sharedbuffer* buffer, const enum barrier_flag flag, const size_t current_pos, size_t* cached_barrier)
+{
+	int status = 0;		// Holds the error status for pthread functions
+
+	// Determine which barrier to update
+	const size_t* shr_barrier = flag == READ ? &buffer->read_barrier : &buffer->write_barrier;
+
+	// Poll the shared barrier until it has updated
+	status = pthread_mutex_lock(&buffer->mutex);
+	if(status != 0) pthread_err(status, "pthread_mutex_lock");
+	*cached_barrier = *shr_barrier;
+	while (current_pos == *cached_barrier) {
+		status = pthread_cond_wait(&buffer->condition, &buffer->mutex);
+		if(status != 0) pthread_err(status, "pthread_cond_wait");
+		*cached_barrier = *shr_barrier;
 	}
 
-	return result;
+	// Release the mutex and return
+	status = pthread_mutex_unlock(&buffer->mutex);
+	if(status != 0) pthread_err(status, "pthread_mutex_unlock");
 }
 
 void pthread_err(const int status, char* message)
