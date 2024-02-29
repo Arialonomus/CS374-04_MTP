@@ -225,7 +225,7 @@ void* print_output(void* arg)
 		else {
 			pthread_cond_broadcast(&input_buf->condition);
 			close(STDOUT_FILENO);
-			exit(EXIT_SUCCESS);
+			return (void*)status;
 		}
 	}
 }
