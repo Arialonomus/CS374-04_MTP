@@ -19,9 +19,6 @@ void* get_input(void* arg)
 			// Check for terminating sequence
 			if (strcmp(line, "STOP\n") == 0) {
 				status = STOPPED;
-				for (int i = 0; i < 5 || !feof(stdin); ++i) {
-					getchar();
-				}
 				line[0] = POISON_PILL_CHAR;
 			}
 
